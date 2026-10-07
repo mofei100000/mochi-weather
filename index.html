@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>天气预报 · Mochi</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+         background: linear-gradient(160deg, #e0f2fe, #f5f3ff); min-height: 100vh; color: #1e293b; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 40px 20px; }
+  h1 { margin: 0 0 6px; font-size: 28px; }
+  p.sub { margin: 0 0 24px; color: #64748b; }
+  form { display: flex; gap: 8px; margin-bottom: 24px; }
+  input { flex: 1; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 12px; font-size: 16px; }
+  button { padding: 12px 20px; border: 0; border-radius: 12px; background: #6366f1; color: #fff; font-size: 16px; cursor: pointer; }
+  button:hover { background: #4f46e5; }
+  .city { font-size: 20px; font-weight: 600; margin-bottom: 12px; }
+  .day { display: grid; grid-template-columns: 90px 48px 1fr auto; align-items: center; gap: 10px;
+         background: #fff; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .date { font-weight: 600; } .date small { display: block; font-weight: 400; color: #94a3b8; }
+  .icon { font-size: 30px; text-align: center; }
+  .desc small { display: block; color: #64748b; font-size: 13px; margin-top: 2px; }
+  .temp { font-weight: 600; white-space: nowrap; } .temp span { color: #94a3b8; font-weight: 400; }
+  .msg { color: #64748b; } footer { margin-top: 28px; font-size: 12px; color: #94a3b8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>天气预报</h1>
+  <p class="sub">输入城市名，看看未来一周会不会下雨</p>
+  <form id="f"><input id="q" value="成都" placeholder="例如：成都、东京、札幌"><button>查询</button></form>
+  <div id="out" class="msg">加载中…</div>
+  <footer>数据来源：Open-Meteo · 由 Mochi 制作</footer>
+</div>
+<script>
+const CODES = {0:["晴","☀️"],1:["大致晴","🌤️"],2:["多云","⛅"],3:["阴","☁️"],45:["雾","🌫️"],48:["雾","🌫️"],
+  51:["小毛毛雨","🌦️"],53:["毛毛雨","🌦️"],55:["大毛毛雨","🌧️"],61:["小雨","🌧️"],63:["中雨","🌧️"],65:["大雨","🌧️"],
+  71:["小雪","🌨️"],73:["中雪","🌨️"],75:["大雪","❄️"],80:["小阵雨","🌦️"],81:["阵雨","🌧️"],82:["强阵雨","⛈️"],95:["雷暴","⛈️"],96:["雷暴冰雹","⛈️"],99:["雷暴冰雹","⛈️"]};
+const WEEK = ["周日","周一","周二","周三","周四","周五","周六"];
+const out = document.getElementById("out");
+async function load(city) {
+  out.className = "msg"; out.textContent = "查询中…";
+  try {
+    const g = await (await fetch("https://geocoding-api.open-meteo.com/v1/search?count=1&language=zh&name=" + encodeURIComponent(city))).json();
+    if (!g.results) { out.textContent = "找不到这个城市：" + city; return; }
+    const p = g.results[0];
+    const d = (await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.latitude}&longitude=${p.longitude}&daily=weather_code,precipitation_probability_max,temperature_2m_max,temperature_2m_min,wind_speed_10m_max&timezone=auto`)).json()).daily;
+    out.className = "";
+    out.innerHTML = `<div class="city">📍 ${p.name}${p.country ? "，" + p.country : ""}</div>` + d.time.map((t, i) => {
+      const [desc, icon] = CODES[d.weather_code[i]] || ["未知", "❔"];
+      const dt = new Date(t + "T00:00");
+      return `<div class="day"><div class="date">${dt.getMonth()+1}月${dt.getDate()}日<small>${i === 0 ? "今天" : WEEK[dt.getDay()]}</small></div>
+        <div class="icon">${icon}</div>
+        <div class="desc">${desc}<small>降雨概率 ${d.precipitation_probability_max[i]}% · 风速 ${d.wind_speed_10m_max[i]} km/h</small></div>
+        <div class="temp">${Math.round(d.temperature_2m_max[i])}° <span>/ ${Math.round(d.temperature_2m_min[i])}°</span></div></div>`;
+    }).join("");
+  } catch (e) { out.textContent = "查询失败，请稍后再试。"; }
+}
+document.getElementById("f").onsubmit = e => { e.preventDefault(); load(document.getElementById("q").value.trim() || "成都"); };
+load("成都");
+</script>
+</body>
+</html>
